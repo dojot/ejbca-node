@@ -1,15 +1,17 @@
 #!/bin/bash
 
+password=${EJBCA_PASS:-secret}
+
 #First we create a new end entity for soap_client
 /opt/primekey/bin/ejbca.sh ra addendentity --username soap_client --dn  \
-"CN=soap_client" --password secret --caname IOTmidCA \
+"CN=soap_client" --password ${password} --caname IOTmidCA \
 --type 1 --token P12
 
 #If the soap_client already exists (persisted) we renew his status
 /opt/primekey/bin/ejbca.sh ra setendentitystatus soap_client -S 10
 
 #To batch a .p12 file, we need to reset the soap client pwd
-/opt/primekey/bin/ejbca.sh ra setclearpwd soap_client secret
+/opt/primekey/bin/ejbca.sh ra setclearpwd soap_client ${password}
 
 # we batch the .p12 certficate
 /opt/primekey/bin/ejbca.sh batch
