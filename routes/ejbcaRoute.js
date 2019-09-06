@@ -1,4 +1,7 @@
 const ejbcaUtils = require('../utils/ejbcaUtils')
+const {logger} = require('@dojot/dojot-module-logger');
+
+const TAG = { filename: "ejbca_routes" };
 
 /* EJBCA ROUTES */
 let ejbcaRoute = (app, client) => {
@@ -8,9 +11,10 @@ let ejbcaRoute = (app, client) => {
     app.get("/ca", (req, res) => {
         client.getAvailableCAs((err, caList) => {
             if (err) {
+                logger.error('Error getting CA data.', TAG);
                 return res.status(400).send({ 'soap error': err.toString() });
             }
-
+            logger.debug('CA data retrieved.', TAG);
             return res.status(200).send({ 'CAs': caList });
         });
 
@@ -22,6 +26,7 @@ let ejbcaRoute = (app, client) => {
 
         client.getLastCAChain(args, (err, cert) => {
             if (err) {
+                logger.error('Error retrieving certificates', TAG);
                 return res.status(400).send({ 'soap error': err.toString() });
             }
 
@@ -30,7 +35,7 @@ let ejbcaRoute = (app, client) => {
             }
 
 
-            console.log(responseParse.certificateData)
+            logger.debug('Certificates retrieved', TAG);
             return res.status(200).send({'certificate': responseParse.certificateData});
         });
 
@@ -44,6 +49,8 @@ let ejbcaRoute = (app, client) => {
 
         client.getCertificate(args, (err, cert) => {
             if (err) {
+                logger.error('Error retrieving ca certificate', TAG);
+
                 return res.status(400).send({ 'soap error': err.toString() });
             }
 
@@ -51,6 +58,7 @@ let ejbcaRoute = (app, client) => {
                 return res.status(404).send({ 'response': 'No certificate found' });
             }
 
+            logger.debug('CA certificate retrieved', TAG);
             return res.status(200).send({ 'certificate': cert });
         })
     })
@@ -67,6 +75,7 @@ let ejbcaRoute = (app, client) => {
                 reasonCode = ejbcaUtils.reasons[req.query.reason];
             }
             else {
+                logger.error('Inexistent reason', TAG);
                 return res.status(404).send({ 'reason error': 'Inexistent reason' });
 
             }
@@ -77,7 +86,7 @@ let ejbcaRoute = (app, client) => {
             if (err) {
                 return res.status(400).send({ 'soap error': err.toString() });
             }
-
+            logger.debug('Certificate revoked', TAG);
             return res.status(200).send();
         })
     })
@@ -90,8 +99,10 @@ let ejbcaRoute = (app, client) => {
 
         client.checkRevokationStatus(args, (err, status) => {
             if (err) {
+                logger.error('Error checking certificate status', TAG);
                 return res.status(400).send({ 'soap error': err.toString() });
             }
+            logger.debug('Certificate status retrieved', TAG);
             return res.status(200).send({ 'status': status });
 
 
@@ -111,6 +122,7 @@ let ejbcaRoute = (app, client) => {
 
         if (req.query.update && req.query.update.toLowerCase() == 'true') {
             //renew the CRL
+            logger.debug('Renewing the CRL.', TAG);
             ejbcaUtils.crlRenew(caname);
         }
 
@@ -118,9 +130,10 @@ let ejbcaRoute = (app, client) => {
 
         client.getLatestCRL(args, (err, crl) => {
             if (err) {
+                logger.error('Error retrieving CRL', TAG);
                 return res.status(400).send({ 'soap error': err.toString() });
             }
-
+            logger.debug('Retrieved CRL.', TAG);
             return res.status(200).send({ 'CRL': crl.return });
 
 
@@ -134,9 +147,10 @@ let ejbcaRoute = (app, client) => {
 
         client.createCRL(args, (err) => {
             if (err) {
+                logger.error('Error creating CRL', TAG);
                 return res.status(400).send({ 'soap error': err.toString() });
             }
-
+            logger.debug('CRL Created.', TAG);
             return res.status(200).send();
         })
     })
@@ -148,6 +162,7 @@ let ejbcaRoute = (app, client) => {
         /* validate errors */
         let result = ejbcaUtils.errorValidator(req, res);
         if (result.hasError) {
+            logger.error('Error validating user request', TAG);
             return res.status(422).json({ 'errors': result.errors });
         }
 
@@ -159,9 +174,10 @@ let ejbcaRoute = (app, client) => {
 
         client.editUser(args, (err) => {
             if (err) {
+                logger.error('Error creating user', TAG);
                 return res.status(400).send({ 'soap error': err.toString() });
             }
-
+            logger.debug('User created.', TAG);
             return res.status(200).send('user created/edited with success.');
         });
     });
@@ -178,9 +194,10 @@ let ejbcaRoute = (app, client) => {
 
         client.findUser(args, (error, user) => {
             if (error) {
+                logger.error('Error finding user', TAG);
                 return res.status(400).send({ 'soap error': error.toString() });
             }
-
+            logger.debug('User found.', TAG);
             return res.status(200).send({ 'user': user.return });
         })
     })
@@ -196,6 +213,7 @@ let ejbcaRoute = (app, client) => {
                 reasonCode = ejbcaUtils.reasons[req.query.reason];
             }
             else {
+                logger.error('Inexistent reason', TAG);
                 return res.status(404).send({ 'reason error': 'Inexistent reason' });
 
             }
@@ -208,9 +226,10 @@ let ejbcaRoute = (app, client) => {
         try {
             await ejbcaUtils.deleteUser(client, req.params.username, reasonCode, deleteAfter);
         } catch (error) {
+            logger.error('Error trying delete the user', TAG);
             return res.status(400).send({ 'soap error': error.err.toString() });
         }
-
+        logger.debug('User deleted.', TAG);
         return res.status(200).send('user deleted with success.');
 
     })
@@ -230,10 +249,13 @@ let ejbcaRoute = (app, client) => {
 
         client.findCerts(args, (err, certs) => {
             if (err) {
+                logger.error('Error trying to find the user', TAG);
+
                 return res.status(400).send({ 'soap error': err.toString() });
             }
 
             if (!certs) {
+                logger.error("User don't have certificate", TAG);
                 return res.status(404).send('No certificate found');
 
             }
@@ -242,7 +264,7 @@ let ejbcaRoute = (app, client) => {
             let responseParse = {
                 data: ejbcaUtils.convertCerttoX509(certs.return[0].certificateData)
             }
-
+            logger.debug('User certificate found.', TAG);
             return res.status(200).send(responseParse);
         });
     })
@@ -254,6 +276,7 @@ let ejbcaRoute = (app, client) => {
         /* validate errors */
         let result = ejbcaUtils.errorValidator(req, res);
         if (result.hasError) {
+            logger.error("Error trying to validate user", TAG);
             return res.status(422).json({ 'errors': result.errors });
         }
 
@@ -267,6 +290,7 @@ let ejbcaRoute = (app, client) => {
         try {
             await ejbcaUtils.findUserandReset(client, username);
         } catch (error) {
+            logger.error("Error trying to find the user", TAG);
             return res.status(404).send({ 'soap error': error });
         }
 
@@ -280,13 +304,14 @@ let ejbcaRoute = (app, client) => {
 
         client.pkcs10Request(args, (error, response) => {
             if (error) {
+                logger.error("Error signing the user", TAG);
                 return res.status(400).send({ 'soap error': error.toString() });
             }
 
             let responseParse = {
                 data: ejbcaUtils.convertCerttoX509(response.return.data)
             }
-
+            logger.debug('User certificate signed with success.', TAG);
             return res.status(200).send({ 'status': responseParse });
         })
     })
@@ -296,9 +321,10 @@ let ejbcaRoute = (app, client) => {
     app.get("/ejbca/version", (req, res) => {
         client.getEjbcaVersion((err, version) => {
             if (err) {
+                logger.error('Error retrieving ejbca version.', TAG);
                 return res.status(400).send({ 'soap error': err.toString() });
             }
-
+            logger.debug('EJBCA version retrieved.', TAG);
             return res.status(200).send({ 'version': version });
         });
 

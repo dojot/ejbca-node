@@ -2,6 +2,9 @@
 const bodyParser = require('body-parser');
 const express = require('express');
 const retryConnection = require('promise-retry');
+const {logger} = require('@dojot/dojot-module-logger');
+
+const TAG = { filename: "app" };
 
 let app = null;
 
@@ -22,22 +25,23 @@ function initApp(clientEJBCA) {
 
     /* Starting the server */
     server.httpServer = server.app.listen(5583, () => {
-        console.log(`Listening on port 5583.`);
+        logger.debug('Listening on port 5583.', TAG);
         server.isInitialized = true;
     })
 
     retryConnection((retry, number) => {
-        console.log(`Trying to connect to ejbca wsdl service.. retries: ${number}`);
+        logger.debug(`Trying to connect to ejbca wsdl service.. retries: ${number}`, TAG);
 
         return clientEJBCA.createClient().catch(retry);
     }).then((ejbcaService) => {
+        logger.debug('Connected to wsdl service', TAG);
 
         /* setting route */
         ejbcaRoute(server.app, ejbcaService);
         return true;
 
     }).catch(err => {
-        console.log(err.toString());
+        logger.error(err.toString(), TAG);
         return false;
     })
 
@@ -45,6 +49,7 @@ function initApp(clientEJBCA) {
 
 function stopApp() {
     if (server.isInitialized) {
+        logger.debug('Stoping the server.');
         server.isInitialized = false;
         server.httpServer.close();
     }
