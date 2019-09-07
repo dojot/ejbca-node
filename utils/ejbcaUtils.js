@@ -2,6 +2,10 @@
 const { execSync } = require('child_process');
 const { check, validationResult } = require('express-validator');
 
+const { logger } = require('@dojot/dojot-module-logger');
+
+const TAG = { filename: "utils" };
+
 let reasons = {
     'AACOMPROMISE': 10,
     'AFFILIATIONCHANGED': 3,
@@ -14,6 +18,84 @@ let reasons = {
     'SUPERSEDED': 4,
     'UNSPECIFIED': 0,
     'NOTREVOKED': -1
+}
+
+function _modifyUserFromMessage(msg, ejbcaClient) {
+
+    let parsed = null;
+    console.log(msg);
+    try {
+        parsed = JSON.parse(msg);
+    } catch (e) {
+        parsed = msg;
+    }
+
+    console.log(parsed);
+    let event = parsed.event;
+    let device = `${parsed.meta.service}:${parsed.data.id}`
+
+    logger.debug(event, TAG);
+    logger.debug(device, TAG);
+
+    let userData = {
+        username: device
+    };
+
+    userData = updateUser(userData);
+
+    let args = { arg0: userData };
+
+    ejbcaClient.editUser(args, (err) => {
+        if (err) {
+            logger.error('Error creating user', TAG);
+            throw err;
+        }
+        logger.debug('User created.', TAG);
+    });
+}
+
+function createMessenger(messenger, dojotConfig, ejbcaClient) {
+
+    /* setting route */
+    logger.debug("Initializing EJBCA messenger...", TAG);
+    return messenger.init().then(() => {
+
+        logger.debug("... EJBCA messenger was successfully initialized.", TAG);
+        logger.debug("Creating channel for devices subject...", TAG);
+
+        messenger.createChannel(dojotConfig.dojot.subjects.devices);
+        logger.debug("... channel for devices was created.", TAG);
+
+        messenger.on(dojotConfig.dojot.subjects.devices, "message", (tenant, msg) => {
+            try {
+                _modifyUserFromMessage(msg, ejbcaClient);
+
+            } catch (error) {
+                logger.warn(error, TAG);
+            }
+
+        })
+
+        messenger.on('iotagent.device', 'device.create', (tenant, msg) => {
+            try {
+                _modifyUserFromMessage(msg, ejbcaClient);
+
+            } catch (error) {
+                logger.warn(error, TAG);
+            }
+
+        })
+
+        logger.debug("... callbacks for DeviceManager devices registered.", TAG);
+
+        logger.debug("... Pulling all created devices...", TAG);
+        messenger.generateDeviceCreateEventForActiveDevices();
+        return Promise.resolve();
+
+    }).catch((error) => {
+        logger.error(`... failed to initialize the EJBCA messenger. Error: ${error.toString()}`, TAG);
+        return Promise.reject(error);
+    });
 }
 
 function crlRenew(caname) {
@@ -182,5 +264,6 @@ module.exports = {
     updateUser,
     deleteUser,
     findUserandReset,
-    convertCerttoX509
+    convertCerttoX509,
+    createMessenger
 }

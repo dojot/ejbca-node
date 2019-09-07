@@ -2,11 +2,9 @@
 const bodyParser = require('body-parser');
 const express = require('express');
 const retryConnection = require('promise-retry');
-const {logger} = require('@dojot/dojot-module-logger');
+const { logger } = require('@dojot/dojot-module-logger');
 
 const TAG = { filename: "app" };
-
-let app = null;
 
 let server = {
     isInitialized: false,
@@ -16,8 +14,9 @@ let server = {
 
 /* EJBCA Routes */
 const ejbcaRoute = require('../routes/ejbcaRoute');
+const ejbcaUtils = require('../utils/ejbcaUtils');
 
-function initApp(clientEJBCA) {
+function initApp(clientEJBCA, messenger, dojotConfig) {
 
     server.app = express();
     server.app.use(bodyParser.json({ type: "*/*" }));
@@ -29,20 +28,23 @@ function initApp(clientEJBCA) {
         server.isInitialized = true;
     })
 
-    retryConnection((retry, number) => {
+    return retryConnection((retry, number) => {
         logger.debug(`Trying to connect to ejbca wsdl service.. retries: ${number}`, TAG);
 
         return clientEJBCA.createClient().catch(retry);
     }).then((ejbcaService) => {
+
         logger.debug('Connected to wsdl service', TAG);
 
-        /* setting route */
+        logger.debug("Setting EJBCA Routes..", TAG);
         ejbcaRoute(server.app, ejbcaService);
-        return true;
+
+        logger.debug("Setting EJBCA Messenger", TAG);
+        return ejbcaUtils.createMessenger(messenger, dojotConfig, ejbcaService);
 
     }).catch(err => {
         logger.error(err.toString(), TAG);
-        return false;
+        return Promise.reject(err);
     })
 
 }
