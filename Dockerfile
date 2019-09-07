@@ -5,6 +5,7 @@ WORKDIR /opt
 
 RUN curl -sL https://rpm.nodesource.com/setup_10.x | bash
 RUN yum -y install nodejs
+RUN yum -y install zlib-devel
 RUN yum -y install  gcc-c++
 RUN yum -y install make
 
