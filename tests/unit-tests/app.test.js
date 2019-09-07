@@ -30,9 +30,10 @@ describe("Testing app client", () => {
 
         });
 
-        it("Should httpServer fail and be stopped", () => {
-            if (!server.initApp(null)) { server.stopApp(); }
-            expect(server.server.isInitialized).toEqual(false);
+        it("Should initApp fail", () => {
+            server.initApp(null).catch(() => {
+                expect(server.server.isInitialized).toEqual(true);
+            })
         })
 
         it("Should httpServer be defined", () => {
@@ -44,6 +45,12 @@ describe("Testing app client", () => {
 
             expect(express().use).toBeCalled();
             expect(server.server.isInitialized).toEqual(true);
+        })
+
+        it("Should initApp fail", () => {
+            server.server.isInitialized = true;
+            server.stopApp();
+            expect(server.server.isInitialized).toEqual(false);
         })
 
 

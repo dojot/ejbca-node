@@ -1,5 +1,4 @@
 "use strict";
-
 jest.mock('child_process');
 let validator = require('express-validator');
 
@@ -60,9 +59,7 @@ describe("Testing EJBCA Utils functionalities", () => {
     describe("Testing deleteUser", () => {
         it("Should return error", async () => {
 
-            let soapClient = {
-                revokeUser: jest.fn((args, callback) => callback('error'))
-            }
+            let soapClient = {revokeUser: jest.fn((args, callback) => callback('error'))}
 
             try {
                 await utils.deleteUser(soapClient, 'test', 'test', 'test');
@@ -78,9 +75,7 @@ describe("Testing EJBCA Utils functionalities", () => {
 
         it("Should not return error", async () => {
 
-            let soapClient = {
-                revokeUser: jest.fn((args, callback) => callback(null))
-            }
+            let soapClient = {revokeUser: jest.fn((args, callback) => callback(null))}
 
 
             let result = await utils.deleteUser(soapClient, 'test', 'test', 'test');
@@ -235,5 +230,61 @@ describe("Testing EJBCA Utils functionalities", () => {
         })
     })
 
+    describe("Testing createMessenger", () => {
+        it("Should fail creating a messenger", () => {
+            let error = 'error';
+            let mockedMessenger = { init: jest.fn(() => Promise.reject(error)) }
 
+            utils.createMessenger(mockedMessenger, null, null).catch((err) => {
+                expect(err).toEqual(error);
+            })
+        })
+
+        it("Should create a messenger and set listeners ", () => {
+            let dojotConfigMock = {dojot: {subjects: {devices: 'device'}}}
+            let mockedSoap = {editUser: jest.fn((args, callback) => callback(null))}
+
+            let mockedDeviceUser = {
+                event: 'event',
+                meta: {service: 'service'},
+                data: {id: 'id'}
+            }
+
+            let mockedMessenger = {
+                init: jest.fn(() => Promise.resolve()),
+                createChannel: jest.fn(),
+                generateDeviceCreateEventForActiveDevices: jest.fn(),
+                on: jest.fn((arg1, arg2, callback) => callback('data', mockedDeviceUser))
+            }
+
+            utils.createMessenger(mockedMessenger, dojotConfigMock, mockedSoap).then(() => {
+                expect(mockedMessenger.createChannel).toBeCalled();
+                expect(mockedMessenger.on).toBeCalled();
+                expect(mockedMessenger.generateDeviceCreateEventForActiveDevices).toBeCalled();
+            })
+        })
+
+        it("Should create a messenger and not set listeners ", () => {
+            let dojotConfigMock = {dojot: {subjects: {devices: 'device'}}}
+            let mockedSoap = {editUser: jest.fn((args, callback) => callback('err'))}
+
+            let mockedDeviceUser = {
+                event: 'event',
+                meta: {service: 'service'},
+                data: {id: 'id'}
+            }
+
+            let mockedMessenger = {
+                init: jest.fn(() => Promise.resolve()),
+                createChannel: jest.fn(),
+                generateDeviceCreateEventForActiveDevices: jest.fn(),
+                on: jest.fn((arg1, arg2, callback) => callback('data', mockedDeviceUser))
+            }
+
+            utils.createMessenger(mockedMessenger, dojotConfigMock, mockedSoap).then(() => {
+                expect(mockedMessenger.createChannel).toBeCalled();
+                expect(mockedMessenger.on).toBeCalled();
+            })
+        })
+    })
 })
